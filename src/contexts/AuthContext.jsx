@@ -5,9 +5,7 @@ const AuthContext = createContext(null);
 
 // Mock users database
 const mockUsers = [
-  { id: 1, email: 'admin@lumen.com', password: 'admin123', role: 'admin', name: 'Admin User' },
-  { id: 2, email: 'user@lumen.com', password: 'user123', role: 'user', name: 'John Doe' },
-  { id: 3, email: 'driver@lumen.com', password: 'driver123', role: 'driver', name: 'Driver User' },
+  { id: 1, email: 'user@lumen.com', password: 'user123', name: 'John Doe' },
 ];
 
 export const AuthProvider = ({ children }) => {
@@ -43,7 +41,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (email, password, name, role = 'user') => {
+  const register = async (email, password, name) => {
     try {
       // Check if user already exists
       if (mockUsers.find(u => u.email === email)) {
@@ -55,7 +53,6 @@ export const AuthProvider = ({ children }) => {
         id: mockUsers.length + 1,
         email,
         password,
-        role,
         name,
       };
       mockUsers.push(newUser);
@@ -85,9 +82,6 @@ export const AuthProvider = ({ children }) => {
     logout,
     loading,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
-    isUser: user?.role === 'user',
-    isDriver: user?.role === 'driver',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

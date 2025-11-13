@@ -16,14 +16,7 @@ export default function Login() {
     
     const result = await login(email, password);
     if (result.success) {
-      const user = JSON.parse(localStorage.getItem('lumen_user'));
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else if (user.role === 'user') {
-        navigate('/user');
-      } else if (user.role === 'driver') {
-        navigate('/driver');
-      }
+      navigate('/dashboard');
     }
     setLoading(false);
   };
@@ -120,10 +113,9 @@ export default function Login() {
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-600 font-medium mb-2">Demo Credentials:</p>
-            <div className="text-xs text-gray-500 space-y-1">
-              <p>Admin: admin@lumen.com / admin123</p>
-              <p>User: user@lumen.com / user123</p>
-              <p>Driver: driver@lumen.com / driver123</p>
+            <div className="text-xs text-gray-500">
+              <p>Email: user@lumen.com</p>
+              <p>Password: user123</p>
             </div>
           </div>
         </div>

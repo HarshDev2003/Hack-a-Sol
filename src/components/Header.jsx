@@ -14,18 +14,6 @@ export default function Header({ onMenuClick }) {
     navigate('/login');
   };
 
-  const getRoleBadgeColor = (role) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-red-100 text-red-800';
-      case 'user':
-        return 'bg-blue-100 text-blue-800';
-      case 'driver':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -66,7 +54,7 @@ export default function Header({ onMenuClick }) {
               </div>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
             </button>
 
@@ -80,14 +68,11 @@ export default function Header({ onMenuClick }) {
                   <div className="px-4 py-2 border-b border-gray-200">
                     <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                     <p className="text-xs text-gray-500">{user?.email}</p>
-                    <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${getRoleBadgeColor(user?.role)}`}>
-                      {user?.role}
-                    </span>
                   </div>
                   <button
                     onClick={() => {
                       setShowDropdown(false);
-                      navigate(`/${user?.role}/settings`);
+                      navigate('/dashboard/settings');
                     }}
                     className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >

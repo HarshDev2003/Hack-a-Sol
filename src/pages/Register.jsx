@@ -9,7 +9,6 @@ export default function Register() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'user',
   });
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -33,16 +32,9 @@ export default function Register() {
     }
 
     setLoading(true);
-    const result = await register(formData.email, formData.password, formData.name, formData.role);
+    const result = await register(formData.email, formData.password, formData.name);
     if (result.success) {
-      const user = JSON.parse(localStorage.getItem('lumen_user'));
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else if (user.role === 'user') {
-        navigate('/user');
-      } else if (user.role === 'driver') {
-        navigate('/driver');
-      }
+      navigate('/dashboard');
     }
     setLoading(false);
   };
@@ -105,23 +97,6 @@ export default function Register() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                className="input-field"
-                value={formData.role}
-                onChange={handleChange}
-              >
-                <option value="user">User</option>
-                <option value="driver">Driver</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password

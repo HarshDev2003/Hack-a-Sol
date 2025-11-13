@@ -6,10 +6,7 @@ import { ProtectedRoute } from './utils/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import AdminDashboard from './pages/AdminDashboard';
-import UserDashboard from './pages/UserDashboard';
-import DriverDashboard from './pages/DriverDashboard';
-import Unauthorized from './pages/Unauthorized';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -19,31 +16,12 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
             
             <Route
-              path="/admin/*"
+              path="/dashboard/*"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/user/*"
-              element={
-                <ProtectedRoute allowedRoles={['user']}>
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/driver/*"
-              element={
-                <ProtectedRoute allowedRoles={['driver']}>
-                  <DriverDashboard />
+                <ProtectedRoute>
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
