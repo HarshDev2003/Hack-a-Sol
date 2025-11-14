@@ -50,10 +50,13 @@ router.get('/summary', auth, async (req, res) => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyData = Object.keys(monthlyPerformance).map(monthKey => {
       const [, month] = monthKey.split('-');
+      const income = monthlyPerformance[monthKey].income;
+      const expenses = monthlyPerformance[monthKey].expenses;
       return {
         month: monthNames[parseInt(month) - 1],
-        income: monthlyPerformance[monthKey].income,
-        expenses: monthlyPerformance[monthKey].expenses
+        income,
+        expenses,
+        profit: income - expenses
       };
     });
 
@@ -67,9 +70,15 @@ router.get('/summary', auth, async (req, res) => {
     });
 
     const categoryData = Object.keys(categoryBreakdown).map(category => ({
-      category,
-      amount: categoryBreakdown[category]
-    })).sort((a, b) => b.amount - a.amount);
+      name: category,
+      value: categoryBreakdown[category]
+    })).sort((a, b) => b.value - a.value);
+
+    // Get recent transactions (last 10)
+    const recentTransactions = await Transaction.find({ user: userId })
+      .sort({ date: -1 })
+      .limit(10)
+      .lean();
 
     res.json({
       success: true,
@@ -81,7 +90,8 @@ router.get('/summary', auth, async (req, res) => {
           documentCount
         },
         monthlyPerformance: monthlyData,
-        categoryBreakdown: categoryData
+        categoryDistribution: categoryData,
+        recentTransactions: recentTransactions
       }
     });
   } catch (error) {

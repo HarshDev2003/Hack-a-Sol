@@ -1,38 +1,85 @@
-import { DollarSign, TrendingUp, TrendingDown, FileText, Bell } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { DollarSign, TrendingUp, TrendingDown, FileText, Bell, Loader2 } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import apiClient from '../../lib/apiClient';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 
-const stats = [
-  { name: 'Total Balance', value: '$12,450.50', change: '+5.2%', icon: DollarSign, color: 'text-green-600' },
-  { name: 'Monthly Income', value: '$5,000.00', change: '+0%', icon: TrendingUp, color: 'text-blue-600' },
-  { name: 'Monthly Expenses', value: '$3,250.00', change: '-8.1%', icon: TrendingDown, color: 'text-red-600' },
-  { name: 'Documents', value: '24', change: '+3', icon: FileText, color: 'text-purple-600' },
-];
-
-const spendingData = [
-  { month: 'Jan', amount: 3200 },
-  { month: 'Feb', amount: 3800 },
-  { month: 'Mar', amount: 3500 },
-  { month: 'Apr', amount: 4200 },
-  { month: 'May', amount: 4000 },
-  { month: 'Jun', amount: 3250 },
-];
-
-const categoryData = [
-  { name: 'Groceries', value: 35, color: '#3b82f6' },
-  { name: 'Shopping', value: 25, color: '#10b981' },
-  { name: 'Food', value: 20, color: '#f59e0b' },
-  { name: 'Gas', value: 12, color: '#ef4444' },
-  { name: 'Utilities', value: 8, color: '#8b5cf6' },
-];
-
-const recentTransactions = [
-  { id: 1, merchant: 'Walmart', amount: 125.50, category: 'Groceries', date: '2024-03-15' },
-  { id: 2, merchant: 'Amazon', amount: 89.99, category: 'Shopping', date: '2024-03-14' },
-  { id: 3, merchant: 'Starbucks', amount: 12.50, category: 'Food', date: '2024-03-13' },
-];
+const calcChange = (current = 0, previous = 0) => {
+  if (!previous) return '0%';
+  const diff = ((current - previous) / previous) * 100;
+  return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
+};
 
 export default function UserDashboardHome() {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const response = await apiClient.get('/analytics/summary');
+        setSummary(response.data.data);
+      } catch (error) {
+        toast.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, []);
+
+  const monthly = summary?.monthlyPerformance || [];
+  const categoryData = summary?.categoryDistribution || [];
+  const recentTransactions = summary?.recentTransactions || [];
+
+  const stats = useMemo(() => {
+    const totals = summary?.totals || { totalIncome: 0, totalExpenses: 0, netBalance: 0, documentCount: 0 };
+    const latest = monthly[monthly.length - 1] || {};
+    const previous = monthly[monthly.length - 2] || {};
+    return [
+      {
+        name: 'Total Balance',
+        value: formatCurrency(totals.netBalance),
+        change: calcChange(latest.profit, previous.profit),
+        icon: DollarSign,
+        color: 'text-green-600'
+      },
+      {
+        name: 'Monthly Income',
+        value: formatCurrency(latest.income || 0),
+        change: calcChange(latest.income, previous.income),
+        icon: TrendingUp,
+        color: 'text-blue-600'
+      },
+      {
+        name: 'Monthly Expenses',
+        value: formatCurrency(latest.expenses || 0),
+        change: calcChange(latest.expenses, previous.expenses),
+        icon: TrendingDown,
+        color: 'text-red-600'
+      },
+      {
+        name: 'Documents',
+        value: totals.documentCount?.toString() || '0',
+        change: `${(summary?.recentTransactions || []).length} transactions tracked`,
+        icon: FileText,
+        color: 'text-purple-600'
+      }
+    ];
+  }, [monthly, summary]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-12 text-gray-500">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Loading your dashboard...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -50,15 +97,15 @@ export default function UserDashboardHome() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
+          const changeClass =
+            stat.change.startsWith('+') ? 'text-green-600' : stat.change.startsWith('-') ? 'text-red-600' : 'text-gray-600';
           return (
             <div key={stat.name} className="card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.name}</p>
                   <p className={`text-2xl font-bold mt-2 ${stat.color}`}>{stat.value}</p>
-                  <p className={`text-sm mt-1 ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                    {stat.change}
-                  </p>
+                  <p className={`text-sm mt-1 ${changeClass}`}>{stat.change}</p>
                 </div>
                 <div className="bg-gray-100 p-3 rounded-lg">
                   <Icon className={`h-6 w-6 ${stat.color}`} />
@@ -72,14 +119,17 @@ export default function UserDashboardHome() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Spending</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Performance</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={spendingData}>
+            <LineChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={2} />
+              <Legend />
+              <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} />
+              <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} />
+              <Line type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -94,13 +144,13 @@ export default function UserDashboardHome() {
                 cy="50%"
                 labelLine={false}
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
+                outerRadius={90}
                 dataKey="value"
               >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
+                {categoryData.map((entry, index) => {
+                  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
+                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                })}
               </Pie>
               <Tooltip />
             </PieChart>
@@ -116,22 +166,35 @@ export default function UserDashboardHome() {
             View all
           </Link>
         </div>
-        <div className="space-y-3">
-          {recentTransactions.map((transaction) => (
-            <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 p-2 rounded-lg">
-                  <FileText className="h-5 w-5 text-primary-600" />
+        {recentTransactions.length === 0 ? (
+          <p className="text-center text-gray-500 py-6">No recent transactions.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentTransactions.map((transaction) => (
+              <div key={transaction._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary-100 p-2 rounded-lg">
+                    <FileText className="h-5 w-5 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{transaction.merchant || '—'}</p>
+                    <p className="text-sm text-gray-500">
+                      {transaction.category || 'Uncategorized'} • {formatDate(transaction.date)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{transaction.merchant}</p>
-                  <p className="text-sm text-gray-500">{transaction.category} • {transaction.date}</p>
-                </div>
+                <p
+                  className={`text-lg font-semibold ${
+                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {transaction.type === 'income' ? '+' : '-'}
+                  {formatCurrency(transaction.amount, transaction.currency)}
+                </p>
               </div>
-              <p className="text-lg font-semibold text-red-600">-${transaction.amount.toFixed(2)}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

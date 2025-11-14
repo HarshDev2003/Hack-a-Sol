@@ -211,9 +211,11 @@ async function processDocumentWithAI(document, userId) {
 
     console.log(`Document ${document._id} processed successfully with ${aiProvider}`);
   } catch (error) {
-    console.error('AI processing failed:', error);
+    console.error('AI processing failed:', error.message);
     document.status = 'failed';
-    document.extractedData = { error: error.message };
+    document.extractedData = { 
+      error: error.message || 'Processing failed. Please try uploading a clearer image or document.'
+    };
     await document.save();
   }
 }
