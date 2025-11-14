@@ -18,30 +18,9 @@ export default function AnomalyDetection() {
   const fetchAnomalies = useCallback(async () => {
     setLoading(true);
     try {
-      const [anomalyRes, transactionsRes] = await Promise.all([
-        apiClient.get('/analytics/anomalies'),
-        apiClient.get('/transactions')
-      ]);
-      const transactions = transactionsRes.data.data || [];
-      const transactionMap = transactions.reduce((acc, trx) => {
-        acc[trx._id] = trx;
-        return acc;
-      }, {});
-
-      const normalized = (anomalyRes.data.data || []).map((item, index) => {
-        const transaction = transactionMap[item.transactionId];
-        return {
-          id: item.transactionId || index,
-          severity: item.riskScore > 0.7 ? 'high' : item.riskScore > 0.4 ? 'medium' : 'low',
-          status: 'pending',
-          type: item.reason || 'Anomaly detected',
-          description: item.recommendation || 'Potential anomaly detected by AI.',
-          riskScore: item.riskScore,
-          transaction: transaction || null
-        };
-      });
-
-      setAnomalies(normalized);
+      const response = await apiClient.get('/anomalies');
+      const anomalies = response.data.data || [];
+      setAnomalies(anomalies);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -53,9 +32,14 @@ export default function AnomalyDetection() {
     fetchAnomalies();
   }, [fetchAnomalies]);
 
-  const handleStatusChange = (id, status) => {
-    setAnomalies((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
-    toast.success(`Anomaly marked as ${status}`);
+  const handleStatusChange = async (id, status) => {
+    try {
+      await apiClient.put(`/anomalies/${id}`, { status });
+      setAnomalies((prev) => prev.map((item) => (item._id === id ? { ...item, status } : item)));
+      toast.success(`Anomaly marked as ${status}`);
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   const filteredAnomalies = useMemo(
@@ -65,7 +49,7 @@ export default function AnomalyDetection() {
 
   const stats = {
     total: anomalies.length,
-    pending: anomalies.filter((a) => a.status === 'pending').length,
+    pending: anomalies.filter((a) => a.status === 'new').length,
     resolved: anomalies.filter((a) => a.status === 'resolved').length,
     high: anomalies.filter((a) => a.severity === 'high').length
   };
@@ -127,7 +111,7 @@ export default function AnomalyDetection() {
 
       <div className="card">
         <div className="flex items-center space-x-4">
-          {['all', 'pending', 'resolved'].map((value) => (
+          {['all', 'new', 'resolved'].map((value) => (
             <button
               key={value}
               onClick={() => setFilter(value)}
@@ -146,7 +130,7 @@ export default function AnomalyDetection() {
       ) : (
         <div className="space-y-4">
           {filteredAnomalies.map((anomaly) => (
-            <div key={anomaly.id} className="card">
+            <div key={anomaly._id} className="card">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center flex-wrap gap-2 mb-3">
@@ -183,17 +167,20 @@ export default function AnomalyDetection() {
                   ) : (
                     <p className="text-sm text-gray-500">No transaction details available.</p>
                   )}
+                  {anomaly.metadata?.recommendation && (
+                    <p className="text-sm text-blue-600 mt-2">💡 {anomaly.metadata.recommendation}</p>
+                  )}
                 </div>
-                {anomaly.status === 'pending' && (
+                {anomaly.status === 'new' && (
                   <div className="flex items-center space-x-2 ml-4">
                     <button
-                      onClick={() => handleStatusChange(anomaly.id, 'resolved')}
+                      onClick={() => handleStatusChange(anomaly._id, 'resolved')}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
                     >
                       Resolve
                     </button>
                     <button
-                      onClick={() => handleStatusChange(anomaly.id, 'ignored')}
+                      onClick={() => handleStatusChange(anomaly._id, 'ignored')}
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
                     >
                       Ignore

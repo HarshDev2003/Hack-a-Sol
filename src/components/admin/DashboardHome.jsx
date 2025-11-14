@@ -1,31 +1,57 @@
-import { TrendingUp, Users, FileText, AlertTriangle, DollarSign, Activity } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { TrendingUp, Users, FileText, AlertTriangle, DollarSign, Activity, Loader2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-const stats = [
-  { name: 'Total Users', value: '2,458', change: '+12.5%', icon: Users, color: 'bg-blue-500' },
-  { name: 'Documents Processed', value: '18,234', change: '+8.2%', icon: FileText, color: 'bg-green-500' },
-  { name: 'Total Transactions', value: '$1.2M', change: '+15.3%', icon: DollarSign, color: 'bg-purple-500' },
-  { name: 'Anomalies Detected', value: '23', change: '-5.1%', icon: AlertTriangle, color: 'bg-red-500' },
-];
-
-const revenueData = [
-  { month: 'Jan', revenue: 45000, expenses: 32000 },
-  { month: 'Feb', revenue: 52000, expenses: 38000 },
-  { month: 'Mar', revenue: 48000, expenses: 35000 },
-  { month: 'Apr', revenue: 61000, expenses: 42000 },
-  { month: 'May', revenue: 55000, expenses: 40000 },
-  { month: 'Jun', revenue: 67000, expenses: 45000 },
-];
-
-const categoryData = [
-  { name: 'Groceries', value: 35, color: '#3b82f6' },
-  { name: 'Shopping', value: 25, color: '#10b981' },
-  { name: 'Food', value: 20, color: '#f59e0b' },
-  { name: 'Gas', value: 12, color: '#ef4444' },
-  { name: 'Utilities', value: 8, color: '#8b5cf6' },
-];
+import toast from 'react-hot-toast';
+import apiClient from '../../lib/apiClient';
+import { formatCurrency } from '../../utils/formatters';
 
 export default function DashboardHome() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalDocuments: 0,
+    totalTransactions: 0,
+    anomaliesDetected: 0,
+    totalVolume: 0
+  });
+  const [revenueData, setRevenueData] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await apiClient.get('/analytics/admin/dashboard');
+        const data = response.data.data;
+        setStats(data.stats);
+        setRevenueData(data.revenueData || []);
+        setCategoryData(data.categoryData || []);
+      } catch (error) {
+        toast.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const statsCards = [
+    { name: 'Total Users', value: stats.totalUsers, change: '+12.5%', icon: Users, color: 'bg-blue-500' },
+    { name: 'Documents Processed', value: stats.totalDocuments, change: '+8.2%', icon: FileText, color: 'bg-green-500' },
+    { name: 'Total Transactions', value: formatCurrency(stats.totalVolume), change: '+15.3%', icon: DollarSign, color: 'bg-purple-500' },
+    { name: 'Anomalies Detected', value: stats.anomaliesDetected, change: '-5.1%', icon: AlertTriangle, color: 'bg-red-500' },
+  ];
+
+  const categoryColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-12 text-gray-500">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Loading dashboard...
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <div>
@@ -35,7 +61,7 @@ export default function DashboardHome() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => {
+        {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <div key={stat.name} className="card">
@@ -80,13 +106,13 @@ export default function DashboardHome() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, value }) => `${name} ${value}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
               >
                 {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+                  <Cell key={`cell-${index}`} fill={categoryColors[index % categoryColors.length]} />
                 ))}
               </Pie>
               <Tooltip />
