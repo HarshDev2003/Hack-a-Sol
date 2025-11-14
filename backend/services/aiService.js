@@ -10,13 +10,14 @@ const openai = new OpenAI({
 });
 
 /**
- * Extract transaction data from text using Gemini AI
+ * Extract transaction data from text using Gemini AI (with retry logic)
  */
-async function extractTransactionDataGemini(text) {
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+async function extractTransactionDataGemini(text, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const prompt = `
+      const prompt = `
 You are a financial document analyzer. Extract transaction information from the following text.
 
 Text: "${text}"
@@ -34,30 +35,40 @@ If any field cannot be determined, use null.
 Return ONLY valid JSON, no additional text.
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
-    
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in AI response');
-    }
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }
 
-    const data = JSON.parse(jsonMatch[0]);
-    
-    // Validate and clean data
-    return {
-      merchant: data.merchant || 'Unknown Merchant',
-      amount: parseFloat(data.amount) || 0,
-      currency: data.currency || 'USD',
-      category: data.category || 'Other',
-      transactionDate: data.date ? new Date(data.date) : new Date(),
-      description: data.description || ''
-    };
-  } catch (error) {
-    console.error('Gemini extraction error:', error);
-    throw error;
+      const data = JSON.parse(jsonMatch[0]);
+      
+      // Validate and clean data
+      return {
+        merchant: data.merchant || 'Unknown Merchant',
+        amount: parseFloat(data.amount) || 0,
+        currency: data.currency || 'USD',
+        category: data.category || 'Other',
+        transactionDate: data.date ? new Date(data.date) : new Date(),
+        description: data.description || ''
+      };
+    } catch (error) {
+      console.error(`Gemini extraction error (attempt ${attempt}/${retries}):`, error.message);
+      
+      // If model is overloaded and we have retries left, wait and retry
+      if ((error.message.includes('overloaded') || error.message.includes('503')) && attempt < retries) {
+        const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        console.log(`Retrying extraction in ${waitTime/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      throw error;
+    }
   }
 }
 
@@ -112,50 +123,57 @@ Return ONLY valid JSON.`
 }
 
 /**
- * Extract text from image using OpenAI Vision
+ * Extract text from image using Gemini 2.5 Flash (with retry logic)
  */
-async function extractTextFromImage(imagePath) {
-  try {
-    // Read image file
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString('base64');
+async function extractTextFromImage(imagePath, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // Use gemini-2.5-flash which is confirmed working
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      
+      // Read image file
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = imageBuffer.toString('base64');
 
-    // Determine mime type from file extension
-    const ext = imagePath.toLowerCase();
-    let mimeType = 'image/jpeg';
-    if (ext.endsWith('.png')) mimeType = 'image/png';
-    else if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) mimeType = 'image/jpeg';
-    else if (ext.endsWith('.webp')) mimeType = 'image/webp';
+      // Determine mime type from file extension
+      const ext = imagePath.toLowerCase();
+      let mimeType = 'image/jpeg';
+      if (ext.endsWith('.png')) mimeType = 'image/png';
+      else if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) mimeType = 'image/jpeg';
+      else if (ext.endsWith('.webp')) mimeType = 'image/webp';
 
-    // Use OpenAI GPT-4 Vision for OCR
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
+      const prompt = `Extract all text from this receipt or invoice image. Include merchant name, amount, date, and any other transaction details. Return all the text you can see.`;
+
+      const result = await model.generateContent([
+        prompt,
         {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Extract all text from this receipt or invoice image. Include merchant name, amount, date, and any other transaction details. Return all the text you can see.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`
-              }
-            }
-          ]
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Image
+          }
         }
-      ],
-      max_tokens: 1000
-    });
+      ]);
 
-    return response.choices[0].message.content;
-  } catch (error) {
-    console.error('Image text extraction error:', error.message);
-    throw error;
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.error(`Gemini image extraction error (attempt ${attempt}/${retries}):`, error.message);
+      
+      // If model is overloaded and we have retries left, wait and retry
+      if (error.message.includes('overloaded') && attempt < retries) {
+        const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        console.log(`Retrying in ${waitTime/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      // If all retries failed, throw error
+      throw new Error('Failed to extract text from image after multiple attempts');
+    }
   }
 }
+
+// OpenAI fallback removed - quota exceeded
 
 /**
  * Extract text from PDF using pdf-parse
@@ -222,11 +240,12 @@ async function processDocument(filePath, mimeType, useAI = 'gemini') {
 }
 
 /**
- * Detect anomalies in transaction using AI
+ * Detect anomalies in transaction using AI (with retry logic)
  */
-async function detectAnomalies(transaction, userTransactionHistory) {
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+async function detectAnomalies(transaction, userTransactionHistory, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Prepare transaction history summary
     const avgAmount = userTransactionHistory.length > 0
@@ -272,19 +291,30 @@ Return ONLY valid JSON.
       return null;
     }
 
-    return JSON.parse(jsonMatch[0]);
-  } catch (error) {
-    console.error('Anomaly detection error:', error);
-    return null;
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error(`Anomaly detection error (attempt ${attempt}/${retries}):`, error.message);
+      
+      // If model is overloaded and we have retries left, wait and retry
+      if ((error.message.includes('overloaded') || error.message.includes('503')) && attempt < retries) {
+        const waitTime = attempt * 2000;
+        console.log(`Retrying anomaly detection in ${waitTime/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      return null;
+    }
   }
 }
 
 /**
- * Generate financial insights using AI
+ * Generate financial insights using AI (with retry logic)
  */
-async function generateFinancialInsights(transactions) {
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+async function generateFinancialInsights(transactions, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Prepare transaction summary
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -328,10 +358,20 @@ Return ONLY valid JSON array.
       return [];
     }
 
-    return JSON.parse(jsonMatch[0]);
-  } catch (error) {
-    console.error('Insights generation error:', error);
-    return [];
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error(`Insights generation error (attempt ${attempt}/${retries}):`, error.message);
+      
+      // If model is overloaded and we have retries left, wait and retry
+      if ((error.message.includes('overloaded') || error.message.includes('503')) && attempt < retries) {
+        const waitTime = attempt * 2000;
+        console.log(`Retrying insights generation in ${waitTime/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      return [];
+    }
   }
 }
 
