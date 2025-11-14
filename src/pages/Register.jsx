@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, User, TrendingUp } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function Register() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
+    confirmPassword: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -20,23 +21,23 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
-    if (formData.password.length < 6) {
-      alert('Password must be at least 6 characters');
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
       return;
     }
 
-    setLoading(true);
-    const result = await register(formData.email, formData.password, formData.name);
+    setSubmitting(true);
+    const result = await register({ name: formData.name, email: formData.email, password: formData.password });
+    setSubmitting(false);
     if (result.success) {
       navigate('/dashboard');
     }
-    setLoading(false);
   };
 
   return (
@@ -138,12 +139,8 @@ export default function Register() {
             </div>
 
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Creating account...' : 'Create account'}
+              <button type="submit" disabled={submitting} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                {submitting ? 'Creating account...' : 'Create account'}
               </button>
             </div>
           </form>

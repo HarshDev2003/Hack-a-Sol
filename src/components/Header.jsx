@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, Bell, User, LogOut, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();

@@ -1,69 +1,76 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, X, CheckCircle } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import apiClient from '../lib/apiClient';
 
-export default function DocumentUpload({ onUpload }) {
+const buildId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+export default function DocumentUpload({ onUploadComplete }) {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
 
-  const onDrop = useCallback((acceptedFiles) => {
-    const newFiles = acceptedFiles.map(file => ({
-      file,
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      status: 'pending',
-    }));
-    
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-    processFiles(newFiles);
+  const updateFile = useCallback((id, payload) => {
+    setUploadedFiles((prev) => prev.map((file) => (file.id === id ? { ...file, ...payload } : file)));
   }, []);
 
-  const processFiles = async (files) => {
-    setProcessing(true);
-    
-    for (const fileObj of files) {
-      // Simulate AI processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileObj.id 
-          ? { ...f, status: 'processed', extractedData: generateMockData() }
-          : f
-      ));
-    }
-    
-    setProcessing(false);
-    toast.success('Documents processed successfully!');
-    
-    if (onUpload) {
-      onUpload(uploadedFiles);
-    }
-  };
+  const processFiles = useCallback(
+    async (files) => {
+      setProcessing(true);
+      for (const fileObj of files) {
+        updateFile(fileObj.id, { status: 'uploading' });
+        try {
+          const formData = new FormData();
+          formData.append('file', fileObj.file);
+          const response = await apiClient.post('/documents', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          updateFile(fileObj.id, { status: 'processed', document: response.data.data });
+          toast.success(`${fileObj.name} uploaded successfully`);
+          onUploadComplete?.(response.data.data);
+        } catch (error) {
+          updateFile(fileObj.id, { status: 'failed', error: error.message });
+          toast.error(`${fileObj.name}: ${error.message}`);
+        }
+      }
+      setProcessing(false);
+    },
+    [onUploadComplete, updateFile]
+  );
 
-  const generateMockData = () => {
-    return {
-      amount: (Math.random() * 1000 + 10).toFixed(2),
-      merchant: ['Walmart', 'Amazon', 'Starbucks', 'Shell', 'Target'][Math.floor(Math.random() * 5)],
-      category: ['Groceries', 'Shopping', 'Food', 'Gas', 'Utilities'][Math.floor(Math.random() * 5)],
-      date: new Date().toISOString().split('T')[0],
-      confidence: (Math.random() * 0.2 + 0.8).toFixed(2),
-    };
-  };
+  const onDrop = useCallback(
+    (acceptedFiles) => {
+      if (!acceptedFiles.length) return;
+      const newFiles = acceptedFiles.map((file) => ({
+        id: buildId(),
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: 'pending'
+      }));
+
+      setUploadedFiles((prev) => [...newFiles, ...prev]);
+      processFiles(newFiles);
+    },
+    [processFiles]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    multiple: true,
     accept: {
       'image/*': ['.png', '.jpg', '.jpeg'],
-      'application/pdf': ['.pdf'],
+      'application/pdf': ['.pdf']
     },
-    maxSize: 10485760, // 10MB
+    maxSize: 15 * 1024 * 1024
   });
 
   const removeFile = (id) => {
-    setUploadedFiles(prev => prev.filter(f => f.id !== id));
+    setUploadedFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
   return (
@@ -85,42 +92,27 @@ export default function DocumentUpload({ onUpload }) {
             <p className="text-gray-600 mb-2">
               Drag & drop receipts, invoices, or transaction records here
             </p>
-            <p className="text-sm text-gray-500">
-              or click to browse (PDF, PNG, JPG up to 10MB)
-            </p>
+            <p className="text-sm text-gray-500">or click to browse (PDF, PNG, JPG up to 15MB)</p>
           </div>
         )}
       </div>
 
       {uploadedFiles.length > 0 && (
         <div className="space-y-2">
-          <h3 className="font-medium text-gray-900">Uploaded Files</h3>
+          <h3 className="font-medium text-gray-900">Recent uploads</h3>
           {uploadedFiles.map((fileObj) => (
-            <div
-              key={fileObj.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-            >
+            <div key={fileObj.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center space-x-3 flex-1">
                 <FileText className="h-5 w-5 text-gray-400" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {fileObj.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {(fileObj.size / 1024).toFixed(2)} KB
-                  </p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{fileObj.name}</p>
+                  <p className="text-xs text-gray-500">{(fileObj.size / 1024).toFixed(2)} KB</p>
                 </div>
-                {fileObj.status === 'processed' && (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                )}
-                {fileObj.status === 'pending' && (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-                )}
+                {fileObj.status === 'processed' && <CheckCircle className="h-5 w-5 text-green-500" />}
+                {fileObj.status === 'uploading' && <Loader2 className="h-5 w-5 text-primary-500 animate-spin" />}
+                {fileObj.status === 'failed' && <AlertCircle className="h-5 w-5 text-red-500" />}
               </div>
-              <button
-                onClick={() => removeFile(fileObj.id)}
-                className="p-1 hover:bg-gray-200 rounded"
-              >
+              <button onClick={() => removeFile(fileObj.id)} className="p-1 hover:bg-gray-200 rounded">
                 <X className="h-4 w-4 text-gray-500" />
               </button>
             </div>
@@ -131,8 +123,8 @@ export default function DocumentUpload({ onUpload }) {
       {processing && (
         <div className="text-center py-4">
           <div className="inline-flex items-center space-x-2 text-primary-600">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-            <span className="text-sm">Processing with AI...</span>
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm">Processing with AI services...</span>
           </div>
         </div>
       )}

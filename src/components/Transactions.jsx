@@ -1,37 +1,62 @@
-import { useState } from 'react';
-import { Search, Filter, TrendingUp, TrendingDown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, Filter, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-const mockTransactions = [
-  { id: 1, merchant: 'Walmart', amount: 125.50, category: 'Groceries', date: '2024-01-15', type: 'expense' },
-  { id: 2, merchant: 'Amazon', amount: 450.00, category: 'Shopping', date: '2024-02-20', type: 'expense' },
-  { id: 3, merchant: 'Salary', amount: 5000.00, category: 'Income', date: '2024-03-01', type: 'income' },
-  { id: 4, merchant: 'Starbucks', amount: 89.99, category: 'Food', date: '2024-03-10', type: 'expense' },
-];
-
-const chartData = [
-  { month: 'Jan', income: 5000, expenses: 3200 },
-  { month: 'Feb', income: 5000, expenses: 3800 },
-  { month: 'Mar', income: 5000, expenses: 3500 },
-  { month: 'Apr', income: 5000, expenses: 4200 },
-  { month: 'May', income: 5000, expenses: 4000 },
-  { month: 'Jun', income: 5000, expenses: 3250 },
-];
+import toast from 'react-hot-toast';
+import apiClient from '../lib/apiClient';
+import useDebouncedValue from '../hooks/useDebouncedValue';
+import { formatCurrency, formatDate } from '../utils/formatters';
 
 export default function Transactions() {
-  const [transactions, setTransactions] = useState(mockTransactions);
+  const [transactions, setTransactions] = useState([]);
+  const [summary, setSummary] = useState({ income: 0, expense: 0 });
+  const [monthlyPerformance, setMonthlyPerformance] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const debouncedSearch = useDebouncedValue(searchTerm);
 
-  const filteredTransactions = transactions.filter(t => {
-    const matchesSearch = t.merchant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterCategory === 'all' || t.category.toLowerCase() === filterCategory.toLowerCase();
-    return matchesSearch && matchesFilter;
-  });
+  const fetchSummary = useCallback(async () => {
+    try {
+      const [summaryRes, analyticsRes] = await Promise.all([
+        apiClient.get('/transactions/summary'),
+        apiClient.get('/analytics/summary')
+      ]);
+      setSummary(summaryRes.data.data || { income: 0, expense: 0 });
+      setMonthlyPerformance(analyticsRes.data.data?.monthlyPerformance || []);
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }, []);
 
-  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/transactions', {
+        params: {
+          search: debouncedSearch || undefined,
+          category: filterCategory !== 'all' ? filterCategory : undefined
+        }
+      });
+      setTransactions(response.data.data || []);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, filterCategory]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const categories = useMemo(() => {
+    const unique = new Set(transactions.map((trx) => trx.category).filter(Boolean));
+    return ['all', ...Array.from(unique)];
+  }, [transactions]);
 
   return (
     <div className="space-y-6">
@@ -40,13 +65,12 @@ export default function Transactions() {
         <p className="text-gray-600 mt-1">View and manage your financial transactions</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Income</p>
-              <p className="text-2xl font-bold text-green-600 mt-2">${totalIncome.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">{formatCurrency(summary.income)}</p>
             </div>
             <TrendingUp className="h-8 w-8 text-green-500" />
           </div>
@@ -55,18 +79,17 @@ export default function Transactions() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-              <p className="text-2xl font-bold text-red-600 mt-2">${totalExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-red-600 mt-2">{formatCurrency(summary.expense)}</p>
             </div>
             <TrendingDown className="h-8 w-8 text-red-500" />
           </div>
         </div>
       </div>
 
-      {/* Chart */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Income vs Expenses</h2>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
+          <BarChart data={monthlyPerformance}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />
@@ -74,18 +97,18 @@ export default function Transactions() {
             <Legend />
             <Bar dataKey="income" fill="#10b981" />
             <Bar dataKey="expenses" fill="#ef4444" />
+            <Bar dataKey="profit" fill="#3b82f6" />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Filters */}
       <div className="card">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search transactions..."
+              placeholder="Search by merchant or category..."
               className="input-field pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -94,52 +117,65 @@ export default function Transactions() {
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <select
-              className="input-field pl-10 pr-8"
+              className="input-field pl-10 pr-8 capitalize"
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
             >
-              <option value="all">All Categories</option>
-              <option value="groceries">Groceries</option>
-              <option value="shopping">Shopping</option>
-              <option value="food">Food</option>
-              <option value="gas">Gas</option>
-              <option value="utilities">Utilities</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat} className="capitalize">
+                  {cat === 'all' ? 'All Categories' : cat}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Transactions List */}
       <div className="card">
-        <div className="space-y-3">
-          {filteredTransactions.map((transaction) => (
-            <div
-              key={transaction.id}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-4">
-                <div className={`p-3 rounded-lg ${
-                  transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
-                }`}>
-                  {transaction.type === 'income' ? (
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <TrendingDown className="h-5 w-5 text-red-600" />
-                  )}
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-gray-500">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Loading transactions...
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No transactions found.</div>
+        ) : (
+          <div className="space-y-3">
+            {transactions.map((transaction) => (
+              <div
+                key={transaction._id}
+                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center space-x-4">
+                  <div
+                    className={`p-3 rounded-lg ${
+                      transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
+                    }`}
+                  >
+                    {transaction.type === 'income' ? (
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <TrendingDown className="h-5 w-5 text-red-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{transaction.merchant || '—'}</p>
+                    <p className="text-sm text-gray-500">
+                      {transaction.category || 'Uncategorized'} • {formatDate(transaction.date)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{transaction.merchant}</p>
-                  <p className="text-sm text-gray-500">{transaction.category} • {transaction.date}</p>
-                </div>
+                <p
+                  className={`text-lg font-semibold ${
+                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency)}
+                </p>
               </div>
-              <p className={`text-lg font-semibold ${
-                transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

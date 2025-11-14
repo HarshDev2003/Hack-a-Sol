@@ -6,19 +6,18 @@ import { Lock, Mail, TrendingUp } from 'lucide-react';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    
+    setSubmitting(true);
     const result = await login(email, password);
+    setSubmitting(false);
     if (result.success) {
       navigate('/dashboard');
     }
-    setLoading(false);
   };
 
   return (
@@ -81,12 +80,8 @@ export default function Login() {
             </div>
 
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Signing in...' : 'Sign in'}
+              <button type="submit" disabled={submitting} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                {submitting ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
           </form>
@@ -103,19 +98,11 @@ export default function Login() {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
                   Sign up
                 </Link>
               </p>
-            </div>
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-600 font-medium mb-2">Demo Credentials:</p>
-            <div className="text-xs text-gray-500">
-              <p>Email: user@lumen.com</p>
-              <p>Password: user123</p>
             </div>
           </div>
         </div>
