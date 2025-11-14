@@ -24,9 +24,12 @@ Text: "${text}"
 
 Extract and return a JSON object with the following fields:
 - merchant: The business or merchant name
-- amount: The transaction amount (number only, no currency symbols)
+- amount: The transaction amount (number only, no currency symbols, always positive)
 - currency: The currency code (e.g., INR, USD, EUR, default to INR if not found)
-- category: The transaction category (e.g., Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Other)
+- type: The transaction type - must be either "income" or "expense"
+  * Use "income" for: salary, payment received, refund, deposit, credit, revenue, earnings, bonus, reimbursement, cashback
+  * Use "expense" for: purchase, bill, payment made, debit, shopping, spending, withdrawal
+- category: The transaction category (e.g., Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Salary, Other)
 - date: The transaction date in ISO format (YYYY-MM-DD)
 - description: A brief description of the transaction
 
@@ -50,8 +53,9 @@ Return ONLY valid JSON, no additional text.
       // Validate and clean data
       return {
         merchant: data.merchant || 'Unknown Merchant',
-        amount: parseFloat(data.amount) || 0,
+        amount: Math.abs(parseFloat(data.amount)) || 0,
         currency: data.currency || 'INR',
+        type: (data.type === 'income' || data.type === 'expense') ? data.type : 'expense',
         category: data.category || 'Other',
         transactionDate: data.date ? new Date(data.date) : new Date(),
         description: data.description || ''
@@ -86,7 +90,7 @@ async function extractTransactionDataOpenAI(text) {
         },
         {
           role: 'user',
-          content: `Extract transaction information from this text and return a JSON object with fields: merchant, amount (number), currency, category (Groceries/Shopping/Food/Gas/Utilities/Transport/Entertainment/Healthcare/Other), date (YYYY-MM-DD), description.
+          content: `Extract transaction information from this text and return a JSON object with fields: merchant, amount (number, always positive), currency, type ("income" or "expense" - income for salary/payment received/refund/deposit/credit, expense for purchase/bill/payment made/debit/shopping), category (Groceries/Shopping/Food/Gas/Utilities/Transport/Entertainment/Healthcare/Salary/Other), date (YYYY-MM-DD), description.
 
 Text: "${text}"
 
@@ -110,8 +114,9 @@ Return ONLY valid JSON.`
     // Validate and clean data
     return {
       merchant: data.merchant || 'Unknown Merchant',
-      amount: parseFloat(data.amount) || 0,
+      amount: Math.abs(parseFloat(data.amount)) || 0,
       currency: data.currency || 'INR',
+      type: (data.type === 'income' || data.type === 'expense') ? data.type : 'expense',
       category: data.category || 'Other',
       transactionDate: data.date ? new Date(data.date) : new Date(),
       description: data.description || ''

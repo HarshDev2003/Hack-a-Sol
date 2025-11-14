@@ -175,7 +175,7 @@ async function processDocumentWithAI(document, userId) {
       amount: extractedData.amount,
       currency: extractedData.currency,
       category: extractedData.category,
-      type: 'expense', // Default to expense, can be updated later
+      type: extractedData.type || 'expense', // Use AI-detected type
       date: extractedData.transactionDate,
       description: extractedData.description,
       document: document._id,
