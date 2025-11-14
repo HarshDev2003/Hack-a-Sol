@@ -41,6 +41,48 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// Get transaction summary (MUST be before /:id route)
+router.get('/summary', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Calculate totals
+    const transactions = await Transaction.find({ user: userId });
+    
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate by category
+    const byCategory = {};
+    transactions.forEach(t => {
+      if (t.type === 'expense') {
+        byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalIncome,
+        totalExpenses,
+        balance: totalIncome - totalExpenses,
+        transactionCount: transactions.length,
+        byCategory
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // Get single transaction
 router.get('/:id', auth, async (req, res) => {
   try {

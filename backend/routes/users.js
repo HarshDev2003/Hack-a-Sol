@@ -1,12 +1,12 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { auth, adminAuth } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all users (admin only)
-router.get('/', auth, adminAuth, async (req, res) => {
+// Get all users (authenticated users only)
+router.get('/', auth, async (req, res) => {
   try {
     const { search, role, status } = req.query;
     const filter = {};
@@ -34,8 +34,8 @@ router.get('/', auth, adminAuth, async (req, res) => {
   }
 });
 
-// Get single user (admin only)
-router.get('/:id', auth, adminAuth, async (req, res) => {
+// Get single user (authenticated users only)
+router.get('/:id', auth, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -58,15 +58,14 @@ router.get('/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-// Create user (admin only)
+// Create user
 router.post('/',
   auth,
-  adminAuth,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('role').optional().isIn(['user', 'driver', 'admin'])
+    body('role').optional().isIn(['user'])
   ],
   async (req, res) => {
     try {
@@ -110,8 +109,8 @@ router.post('/',
   }
 );
 
-// Update user (admin only)
-router.put('/:id', auth, adminAuth, async (req, res) => {
+// Update user
+router.put('/:id', auth, async (req, res) => {
   try {
     const updateData = { ...req.body };
     
@@ -143,8 +142,8 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
-// Delete user (admin only)
-router.delete('/:id', auth, adminAuth, async (req, res) => {
+// Delete user
+router.delete('/:id', auth, async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
 
