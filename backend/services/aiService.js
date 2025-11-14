@@ -14,7 +14,7 @@ const openai = new OpenAI({
  */
 async function extractTransactionDataGemini(text) {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `
 You are a financial document analyzer. Extract transaction information from the following text.
