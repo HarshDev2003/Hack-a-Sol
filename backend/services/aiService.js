@@ -25,7 +25,7 @@ Text: "${text}"
 Extract and return a JSON object with the following fields:
 - merchant: The business or merchant name
 - amount: The transaction amount (number only, no currency symbols)
-- currency: The currency code (e.g., USD, EUR, default to USD if not found)
+- currency: The currency code (e.g., INR, USD, EUR, default to INR if not found)
 - category: The transaction category (e.g., Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Other)
 - date: The transaction date in ISO format (YYYY-MM-DD)
 - description: A brief description of the transaction
@@ -51,7 +51,7 @@ Return ONLY valid JSON, no additional text.
       return {
         merchant: data.merchant || 'Unknown Merchant',
         amount: parseFloat(data.amount) || 0,
-        currency: data.currency || 'USD',
+        currency: data.currency || 'INR',
         category: data.category || 'Other',
         transactionDate: data.date ? new Date(data.date) : new Date(),
         description: data.description || ''
@@ -111,7 +111,7 @@ Return ONLY valid JSON.`
     return {
       merchant: data.merchant || 'Unknown Merchant',
       amount: parseFloat(data.amount) || 0,
-      currency: data.currency || 'USD',
+      currency: data.currency || 'INR',
       category: data.category || 'Other',
       transactionDate: data.date ? new Date(data.date) : new Date(),
       description: data.description || ''
@@ -330,16 +330,16 @@ async function generateFinancialInsights(transactions, retries = 3) {
     const topCategories = Object.entries(categoryBreakdown)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([cat, amt]) => `${cat}: $${amt.toFixed(2)}`)
+      .map(([cat, amt]) => `${cat}: ₹${amt.toFixed(2)}`)
       .join(', ');
 
     const prompt = `
 As a financial advisor, provide insights and recommendations based on this spending data.
 
 Summary:
-- Total Income: $${totalIncome.toFixed(2)}
-- Total Expenses: $${totalExpenses.toFixed(2)}
-- Net: $${(totalIncome - totalExpenses).toFixed(2)}
+- Total Income: ₹${totalIncome.toFixed(2)}
+- Total Expenses: ₹${totalExpenses.toFixed(2)}
+- Net: ₹${(totalIncome - totalExpenses).toFixed(2)}
 - Top spending categories: ${topCategories}
 - Number of transactions: ${transactions.length}
 

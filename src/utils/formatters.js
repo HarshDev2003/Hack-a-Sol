@@ -1,5 +1,5 @@
-export const formatCurrency = (amount = 0, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', {
+export const formatCurrency = (amount = 0, currency = 'INR') =>
+  new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
     maximumFractionDigits: 2

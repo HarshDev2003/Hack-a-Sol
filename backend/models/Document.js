@@ -44,7 +44,7 @@ const documentSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'USD'
+    default: 'INR'
   },
   transactionDate: {
     type: Date
