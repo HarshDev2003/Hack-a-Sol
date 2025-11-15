@@ -34,6 +34,50 @@ export default function Documents() {
     fetchDocuments(debouncedSearch);
   }, [debouncedSearch, fetchDocuments]);
 
+  const handleView = (id) => {
+    try {
+      // Get token from localStorage using the correct key
+      const token = localStorage.getItem('lumen_token');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+      
+      // Create URL with token as query parameter
+      const url = `${import.meta.env.VITE_API_URL}/documents/${id}/view?token=${encodeURIComponent(token)}`;
+      
+      // Open in new tab
+      window.open(url, '_blank');
+    } catch (error) {
+      toast.error('Failed to view document: ' + error.message);
+    }
+  };
+
+  const handleDownload = (id) => {
+    try {
+      // Get token from localStorage using the correct key
+      const token = localStorage.getItem('lumen_token');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+      
+      // Create URL with token as query parameter
+      const url = `${import.meta.env.VITE_API_URL}/documents/${id}/download?token=${encodeURIComponent(token)}`;
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      toast.error('Failed to download document: ' + error.message);
+    }
+  };
+
   const handleDelete = async (id) => {
     setDeletingId(id);
     try {
@@ -124,18 +168,18 @@ export default function Documents() {
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
                   <button
-                    disabled
-                    title="Preview coming soon"
-                    className="p-2 rounded-lg text-gray-400 cursor-not-allowed bg-gray-100"
+                    onClick={() => handleView(doc._id)}
+                    className="p-2 hover:bg-gray-200 rounded-lg"
+                    title="View document"
                   >
-                    <Eye className="h-5 w-5" />
+                    <Eye className="h-5 w-5 text-gray-600" />
                   </button>
                   <button
-                    disabled
-                    title="Download coming soon"
-                    className="p-2 rounded-lg text-gray-400 cursor-not-allowed bg-gray-100"
+                    onClick={() => handleDownload(doc._id)}
+                    className="p-2 hover:bg-gray-200 rounded-lg"
+                    title="Download document"
                   >
-                    <Download className="h-5 w-5" />
+                    <Download className="h-5 w-5 text-gray-600" />
                   </button>
                   <button
                     onClick={() => handleDelete(doc._id)}

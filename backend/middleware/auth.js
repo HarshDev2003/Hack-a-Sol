@@ -3,7 +3,13 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Check for token in Authorization header first, then in query parameters
+    let token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    // If not in header, check query parameters
+    if (!token) {
+      token = req.query.token;
+    }
     
     if (!token) {
       return res.status(401).json({

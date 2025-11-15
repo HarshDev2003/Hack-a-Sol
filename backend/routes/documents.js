@@ -7,7 +7,6 @@ const Transaction = require('../models/Transaction');
 const Anomaly = require('../models/Anomaly');
 const { auth } = require('../middleware/auth');
 const { processDocument, detectAnomalies } = require('../services/aiService');
-
 const router = express.Router();
 
 // Create uploads directory if it doesn't exist
@@ -93,6 +92,102 @@ router.get('/:id', auth, async (req, res) => {
       data: document
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Download document file
+router.get('/:id/download', auth, async (req, res) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      user: req.userId
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found'
+      });
+    }
+
+    // Set headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+    res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(document.filePath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (err) => {
+      console.error('File stream error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Error downloading file'
+      });
+    });
+
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// View document file
+router.get('/:id/view', auth, async (req, res) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      user: req.userId
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found'
+      });
+    }
+
+    // Set headers for inline viewing
+    res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
+    res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(document.filePath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (err) => {
+      console.error('File stream error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Error viewing file'
+      });
+    });
+
+  } catch (error) {
+    console.error('View error:', error);
     res.status(500).json({
       success: false,
       message: error.message
