@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -14,18 +9,17 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { TrendingUp, DollarSign, Activity, Loader2, FileText } from 'lucide-react';
+import { TrendingUp, DollarSign, Activity, Loader2, FileText, Plus, Send, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient from '../lib/apiClient';
 import { formatCurrency } from '../utils/formatters';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
-
-const calcShare = (value = 0, total = 1) => ((value / (total || 1)) * 100).toFixed(1);
-
 export default function Analytics() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [participants, setParticipants] = useState([{ name: '', phone: '', amount: '' }]);
+  const [description, setDescription] = useState('');
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -42,8 +36,60 @@ export default function Analytics() {
     fetchSummary();
   }, []);
 
+  const addParticipant = () => {
+    setParticipants([...participants, { name: '', phone: '', amount: '' }]);
+  };
+
+  const updateParticipant = (index, field, value) => {
+    const updated = [...participants];
+    updated[index][field] = value;
+    setParticipants(updated);
+  };
+
+  const removeParticipant = (index) => {
+    if (participants.length > 1) {
+      const updated = [...participants];
+      updated.splice(index, 1);
+      setParticipants(updated);
+    }
+  };
+
+  const calculateSplit = () => {
+    const total = participants.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    return total;
+  };
+
+  const sendSplitNotifications = async () => {
+    if (!description.trim()) {
+      toast.error('Please enter a description for the split');
+      return;
+    }
+
+    const invalidParticipants = participants.some(p => !p.name.trim() || !p.phone.trim() || isNaN(parseFloat(p.amount)));
+    if (invalidParticipants) {
+      toast.error('Please fill in all participant names, phone numbers, and valid amounts');
+      return;
+    }
+
+    setSending(true);
+    try {
+      await apiClient.post('/analytics/split-notifications', {
+        description,
+        participants,
+        total: calculateSplit()
+      });
+      toast.success('Split notifications sent successfully!');
+      // Reset form
+      setParticipants([{ name: '', phone: '', amount: '' }]);
+      setDescription('');
+    } catch (error) {
+      toast.error(error.message || 'Failed to send notifications');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const monthlyData = summary?.monthlyPerformance || [];
-  const categoryData = summary?.categoryDistribution || [];
 
   const metrics = useMemo(() => {
     const totals = summary?.totals || { totalIncome: 0, totalExpenses: 0, documentCount: 0 };
@@ -117,60 +163,115 @@ export default function Analytics() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Performance</h2>
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} />
-              <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} />
-              <Line type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Spending Distribution</h2>
-          <ResponsiveContainer width="100%" height={320}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name} ${calcShare(value, totals.totalExpenses)}%`}
-                outerRadius={100}
-                dataKey="value"
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Keep Monthly Performance Chart */}
+      <div className="card">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Performance</h2>
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={monthlyData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} />
+            <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
+      {/* Add Money Split Functionality */}
       <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Category Breakdown</h2>
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={categoryData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => formatCurrency(value)} />
-            <Legend />
-            <Bar dataKey="value" name="Spend" fill="#6366f1" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Money Split Calculator</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Dinner bill, Trip expenses"
+              className="input-field w-full"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="font-medium text-gray-900">Participants</h3>
+              <button
+                type="button"
+                onClick={addParticipant}
+                className="btn-secondary flex items-center space-x-1 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Person</span>
+              </button>
+            </div>
+
+            {participants.map((participant, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="md:col-span-4">
+                  <label className="block text-xs text-gray-500 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={participant.name}
+                    onChange={(e) => updateParticipant(index, 'name', e.target.value)}
+                    placeholder="Participant name"
+                    className="input-field w-full"
+                  />
+                </div>
+                <div className="md:col-span-4">
+                  <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={participant.phone}
+                    onChange={(e) => updateParticipant(index, 'phone', e.target.value)}
+                    placeholder="+1234567890"
+                    className="input-field w-full"
+                  />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-xs text-gray-500 mb-1">Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={participant.amount}
+                    onChange={(e) => updateParticipant(index, 'amount', e.target.value)}
+                    placeholder="0.00"
+                    className="input-field w-full"
+                    step="0.01"
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  {participants.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeParticipant(index)}
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-900">Total:</span>
+                <span className="text-lg font-bold text-gray-900">{formatCurrency(calculateSplit())}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={sendSplitNotifications}
+              disabled={sending}
+              className="btn-primary flex items-center justify-center space-x-2 w-full"
+            >
+              <Send className={`h-4 w-4 ${sending ? 'animate-spin' : ''}`} />
+              <span>{sending ? 'Sending...' : 'Send Split Notifications via SMS'}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
