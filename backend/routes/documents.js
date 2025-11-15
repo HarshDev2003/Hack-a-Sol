@@ -175,13 +175,12 @@ async function processDocumentWithAI(document, userId) {
       amount: extractedData.amount,
       currency: extractedData.currency,
       category: extractedData.category,
-      type: 'expense', // Default to expense, can be updated later
+      type: extractedData.type || 'expense', // Use detected type, default to expense
       date: extractedData.transactionDate,
       description: extractedData.description,
       document: document._id,
       status: 'completed'
     });
-
     await transaction.save();
 
     // Get user's transaction history for anomaly detection

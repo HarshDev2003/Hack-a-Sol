@@ -23,16 +23,25 @@ You are a financial document analyzer. Extract transaction information from the 
 Text: "${text}"
 
 Extract and return a JSON object with the following fields:
-- merchant: The business or merchant name
-- amount: The transaction amount (number only, no currency symbols)
+- merchant: The business or merchant name (string)
+- amount: The transaction amount as a number (e.g., 125.50)
 - currency: The currency code (e.g., INR, USD, EUR, default to INR if not found)
-- category: The transaction category (e.g., Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Other)
-- date: The transaction date in ISO format (YYYY-MM-DD)
-- description: A brief description of the transaction
+- type: The transaction type - must be either "income" or "expense"
+  * Use "income" for: salary, payment received, refund, deposit, credit, revenue, earnings, bonus, reimbursement, cashback
+  * Use "expense" for: purchase, bill, payment made, debit, shopping, spending, withdrawal
+- category: The transaction category (choose from: Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Salary, Other)
+- date: The transaction date in ISO format YYYY-MM-DD (e.g., 2024-12-25)
+- description: A brief description of the transaction (string)
 
-If any field cannot be determined, use null.
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid JSON, nothing else
+2. If any field cannot be determined, use null
+3. Amount must be a number, not a string
+4. Date must be in YYYY-MM-DD format
+5. Do not include any explanations, only JSON
 
-Return ONLY valid JSON, no additional text.
+Example response:
+{"merchant": "Walmart", "amount": 125.50, "currency": "INR", "type": "expense", "category": "Groceries", "date": "2024-12-25", "description": "Weekly grocery shopping"}
 `;
 
       const result = await model.generateContent(prompt);
@@ -52,11 +61,11 @@ Return ONLY valid JSON, no additional text.
         merchant: data.merchant || 'Unknown Merchant',
         amount: parseFloat(data.amount) || 0,
         currency: data.currency || 'INR',
+        type: (data.type && (data.type === 'income' || data.type === 'expense')) ? data.type : 'expense',
         category: data.category || 'Other',
         transactionDate: data.date ? new Date(data.date) : new Date(),
         description: data.description || ''
-      };
-    } catch (error) {
+      };    } catch (error) {
       console.error(`Gemini extraction error (attempt ${attempt}/${retries}):`, error.message);
       
       // If model is overloaded and we have retries left, wait and retry
@@ -86,11 +95,21 @@ async function extractTransactionDataOpenAI(text) {
         },
         {
           role: 'user',
-          content: `Extract transaction information from this text and return a JSON object with fields: merchant, amount (number), currency, category (Groceries/Shopping/Food/Gas/Utilities/Transport/Entertainment/Healthcare/Other), date (YYYY-MM-DD), description.
+          content: `Extract transaction information from this text and return ONLY a valid JSON object with these exact fields: merchant (string), amount (number), currency (string, default INR), type (string, either "income" or "expense" - use "income" for salary, payment received, refund, deposit, credit, revenue, earnings, bonus, reimbursement, cashback and "expense" for purchase, bill, payment made, debit, shopping, spending, withdrawal), category (choose from: Groceries, Shopping, Food, Gas, Utilities, Transport, Entertainment, Healthcare, Salary, Other), date (string in YYYY-MM-DD format), description (string).
 
 Text: "${text}"
 
-Return ONLY valid JSON.`
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid JSON, nothing else
+2. If any field cannot be determined, use null
+3. Amount must be a number, not a string
+4. Date must be in YYYY-MM-DD format
+5. Do not include any explanations, only JSON
+
+Example response:
+{"merchant": "Walmart", "amount": 125.50, "currency": "INR", "type": "expense", "category": "Groceries", "date": "2024-12-25", "description": "Weekly grocery shopping"}
+
+JSON RESPONSE:`
         }
       ],
       temperature: 0.3,
@@ -112,11 +131,11 @@ Return ONLY valid JSON.`
       merchant: data.merchant || 'Unknown Merchant',
       amount: parseFloat(data.amount) || 0,
       currency: data.currency || 'INR',
+      type: (data.type && (data.type === 'income' || data.type === 'expense')) ? data.type : 'expense',
       category: data.category || 'Other',
       transactionDate: data.date ? new Date(data.date) : new Date(),
       description: data.description || ''
-    };
-  } catch (error) {
+    };  } catch (error) {
     console.error('OpenAI extraction error:', error);
     throw error;
   }
@@ -142,7 +161,15 @@ async function extractTextFromImage(imagePath, retries = 3) {
       else if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) mimeType = 'image/jpeg';
       else if (ext.endsWith('.webp')) mimeType = 'image/webp';
 
-      const prompt = `Extract all text from this receipt or invoice image. Include merchant name, amount, date, and any other transaction details. Return all the text you can see.`;
+      const prompt = `Extract all text from this receipt or invoice image. Focus on these key financial details:
+- Merchant/Business Name
+- Transaction Amount (numbers only)
+- Transaction Date (in DD/MM/YYYY or MM/DD/YYYY format)
+- Transaction Type (income or expense)
+- Itemized purchases or services
+- Payment method if visible
+
+Return all the readable text you can extract from the image. Be thorough and accurate.`;
 
       const result = await model.generateContent([
         prompt,
