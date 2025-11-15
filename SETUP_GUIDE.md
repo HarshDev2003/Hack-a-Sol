@@ -81,7 +81,7 @@ The frontend will start on `http://localhost:5173` (or the next available port)
    - Name: Test User
    - Email: test@example.com
    - Password: password123
-   - Role: user (default)
+   - Role: user
 
 ### 2. Create Test Data
 
@@ -106,28 +106,7 @@ curl -X POST http://localhost:5000/api/transactions \
   }'
 ```
 
-### 3. Create Admin User
 
-To test admin features, you need to create an admin user. You can do this by:
-
-1. Register a regular user through the UI
-2. Manually update the user's role in MongoDB:
-
-```bash
-# Open MongoDB shell
-mongosh
-
-# Switch to the database
-use lumen-finance
-
-# Update user role to admin
-db.users.updateOne(
-  { email: "test@example.com" },
-  { $set: { role: "admin" } }
-)
-```
-
-3. Log out and log back in to see admin features
 
 ## API Endpoints Summary
 
@@ -149,7 +128,6 @@ db.users.updateOne(
 
 ### Analytics
 - `GET /api/analytics/summary` - User analytics
-- `GET /api/analytics/admin/dashboard` - Admin dashboard stats
 
 ### Reminders
 - `GET /api/reminders` - List reminders
@@ -160,12 +138,6 @@ db.users.updateOne(
 ### Anomalies
 - `GET /api/anomalies` - List anomalies
 - `PUT /api/anomalies/:id` - Update anomaly status
-
-### Users (Admin Only)
-- `GET /api/users` - List all users
-- `POST /api/users` - Create user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
 
 ## Project Structure
 
@@ -229,7 +201,7 @@ Finance/
 ✅ CORS enabled
 
 ### Models
-✅ User (with roles: user, driver, admin)
+✅ User (with role: user)
 ✅ Transaction
 ✅ Document
 ✅ Reminder
@@ -239,10 +211,9 @@ Finance/
 ✅ Authentication (register, login, me)
 ✅ Transactions (CRUD)
 ✅ Documents (upload, list, delete)
-✅ Analytics (user summary, admin dashboard)
+✅ Analytics (user summary)
 ✅ Reminders (CRUD)
 ✅ Anomalies (list, update status)
-✅ Users (admin management)
 
 ## Troubleshooting
 

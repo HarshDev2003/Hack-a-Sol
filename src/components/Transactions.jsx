@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Filter, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { Search, Filter, TrendingUp, TrendingDown, Loader2, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import apiClient from '../lib/apiClient';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { useRefreshSubscription } from '../hooks/useRefresh';
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -13,6 +14,7 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const debouncedSearch = useDebouncedValue(searchTerm);
 
   const fetchSummary = useCallback(async () => {
@@ -29,7 +31,9 @@ export default function Transactions() {
   }, []);
 
   const fetchTransactions = useCallback(async () => {
-    setLoading(true);
+    if (!refreshing) {
+      setLoading(true);
+    }
     try {
       const response = await apiClient.get('/transactions', {
         params: {
@@ -42,8 +46,17 @@ export default function Transactions() {
       toast.error(error.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [debouncedSearch, filterCategory]);
+  }, [debouncedSearch, filterCategory, refreshing]);
+
+  const refreshData = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchSummary(), fetchTransactions()]);
+  }, [fetchSummary, fetchTransactions]);
+
+  // Subscribe to refresh events (must be after refreshData is defined)
+  useRefreshSubscription(refreshData);
 
   useEffect(() => {
     fetchSummary();
@@ -61,8 +74,20 @@ export default function Transactions() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-        <p className="text-gray-600 mt-1">View and manage your financial transactions</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
+            <p className="text-gray-600 mt-1">View and manage your financial transactions</p>
+          </div>
+          <button
+            onClick={refreshData}
+            disabled={refreshing}
+            className="btn-secondary flex items-center space-x-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -97,7 +122,6 @@ export default function Transactions() {
             <Legend />
             <Bar dataKey="income" fill="#10b981" />
             <Bar dataKey="expenses" fill="#ef4444" />
-            <Bar dataKey="profit" fill="#3b82f6" />
           </BarChart>
         </ResponsiveContainer>
       </div>

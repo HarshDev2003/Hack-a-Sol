@@ -1,9 +1,7 @@
 const express = require('express');
 const Transaction = require('../models/Transaction');
 const Document = require('../models/Document');
-const User = require('../models/User');
-const Anomaly = require('../models/Anomaly');
-const { auth, adminAuth } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { generateFinancialInsights } = require('../services/aiService');
 
 const router = express.Router();
@@ -125,88 +123,6 @@ router.get('/insights', auth, async (req, res) => {
         insights,
         transactionCount: transactions.length,
         analyzedPeriod: '3 months'
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
-
-// Admin analytics - Overall platform statistics
-router.get('/admin/dashboard', auth, adminAuth, async (req, res) => {
-  try {
-    const userCount = await User.countDocuments();
-    const documentCount = await Document.countDocuments();
-    const transactionCount = await Transaction.countDocuments();
-    const anomalyCount = await Anomaly.countDocuments({ status: 'new' });
-
-    // Total transaction volume
-    const allTransactions = await Transaction.find();
-    const totalVolume = allTransactions.reduce((sum, t) => sum + t.amount, 0);
-
-    // Monthly revenue/expenses
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const recentTransactions = await Transaction.find({
-      date: { $gte: sixMonthsAgo }
-    }).sort({ date: 1 });
-
-    const monthlyData = {};
-    recentTransactions.forEach(transaction => {
-      const monthKey = transaction.date.toISOString().substring(0, 7);
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { income: 0, expenses: 0 };
-      }
-      if (transaction.type === 'income') {
-        monthlyData[monthKey].income += transaction.amount;
-      } else {
-        monthlyData[monthKey].expenses += transaction.amount;
-      }
-    });
-
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const revenueData = Object.keys(monthlyData).map(monthKey => {
-      const [, month] = monthKey.split('-');
-      return {
-        month: monthNames[parseInt(month) - 1],
-        revenue: monthlyData[monthKey].income,
-        expenses: monthlyData[monthKey].expenses
-      };
-    });
-
-    // Category distribution
-    const categoryBreakdown = {};
-    allTransactions.forEach(transaction => {
-      if (transaction.type === 'expense') {
-        categoryBreakdown[transaction.category] = 
-          (categoryBreakdown[transaction.category] || 0) + transaction.amount;
-      }
-    });
-
-    const categoryData = Object.keys(categoryBreakdown)
-      .map(category => ({
-        name: category,
-        value: Math.round((categoryBreakdown[category] / totalVolume) * 100)
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
-    res.json({
-      success: true,
-      data: {
-        stats: {
-          totalUsers: userCount,
-          totalDocuments: documentCount,
-          totalTransactions: transactionCount,
-          anomaliesDetected: anomalyCount,
-          totalVolume
-        },
-        revenueData,
-        categoryData
       }
     });
   } catch (error) {

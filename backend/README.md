@@ -10,7 +10,6 @@ Backend API for the LUMEN Financial Intelligence Platform built with Node.js, Ex
 - Analytics and insights
 - Smart reminders
 - Anomaly detection
-- User management (admin)
 
 ## Prerequisites
 
@@ -77,7 +76,6 @@ The server will start on `http://localhost:5000` by default.
 
 ### Analytics
 - `GET /api/analytics/summary` - Get user analytics summary
-- `GET /api/analytics/admin/dashboard` - Get admin dashboard stats (admin only)
 
 ### Reminders
 - `GET /api/reminders` - Get all reminders
@@ -91,13 +89,6 @@ The server will start on `http://localhost:5000` by default.
 - `GET /api/anomalies/:id` - Get single anomaly
 - `PUT /api/anomalies/:id` - Update anomaly status
 - `DELETE /api/anomalies/:id` - Delete anomaly
-
-### Users (Admin Only)
-- `GET /api/users` - Get all users
-- `GET /api/users/:id` - Get single user
-- `POST /api/users` - Create user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
 
 ## Project Structure
 
@@ -132,8 +123,6 @@ backend/
 ## Default User Roles
 
 - `user` - Regular user with access to personal data
-- `driver` - Driver role with additional vehicle management
-- `admin` - Full administrative access
 
 ## Security
 

@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, X, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient from '../lib/apiClient';
+import { useRefresh } from '../hooks/useRefresh';
 
 const buildId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -12,6 +13,7 @@ const buildId = () =>
 export default function DocumentUpload({ onUploadComplete }) {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
+  const { triggerRefresh } = useRefresh();
 
   const updateFile = useCallback((id, payload) => {
     setUploadedFiles((prev) => prev.map((file) => (file.id === id ? { ...file, ...payload } : file)));
@@ -31,6 +33,8 @@ export default function DocumentUpload({ onUploadComplete }) {
           updateFile(fileObj.id, { status: 'processed', document: response.data.data });
           toast.success(`${fileObj.name} uploaded successfully`);
           onUploadComplete?.(response.data.data);
+          // Trigger refresh for other components
+          triggerRefresh();
         } catch (error) {
           updateFile(fileObj.id, { status: 'failed', error: error.message });
           toast.error(`${fileObj.name}: ${error.message}`);
