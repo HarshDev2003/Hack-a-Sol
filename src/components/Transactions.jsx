@@ -23,8 +23,21 @@ export default function Transactions() {
         apiClient.get('/transactions/summary'),
         apiClient.get('/analytics/summary')
       ]);
-      setSummary(summaryRes.data.data || { income: 0, expense: 0 });
-      setMonthlyPerformance(analyticsRes.data.data?.monthlyPerformance || []);
+      
+      // Extract income and expense from transactions summary
+      const summaryData = summaryRes.data.data || { totalIncome: 0, totalExpenses: 0 };
+      
+      // Extract monthly performance from analytics summary
+      const analyticsData = analyticsRes.data.data || {};
+      
+      // Set summary with the correct property names
+      setSummary({
+        income: summaryData.totalIncome || 0,
+        expense: summaryData.totalExpenses || 0
+      });
+      
+      // Set monthly performance data
+      setMonthlyPerformance(analyticsData.monthlyPerformance || []);
     } catch (error) {
       toast.error(error.message);
     }
