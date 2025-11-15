@@ -1,0 +1,17 @@
+##FRONTEND ENV :
+
+VITE_API_URL=http://localhost:5000/api
+
+##BACKEND ENV :
+
+PORT=5000
+# MONGODB_URI=mongodb://localhost:27017/lumen
+MONGODB_URI=mongodb+srv://jaykumarsoni944_db_user:RfmfcLVWHWBeAxh7@cluster0.xrmnvmr.mongodb.net/lumen-finance
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+NODE_ENV=development
+UPLOAD_DIR=uploads
+
+# AI API Keys
+GEMINI_API_KEY=AIzaSyCdnhUWislW4lrjHqsllRmfZwXbXCmYCJs
+# OPENAI_API_KEY=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
+OPENAI_API_KEY=AIzaSyCdnhUWislW4lrjHqsllRmfZwXbXCmYCJs
