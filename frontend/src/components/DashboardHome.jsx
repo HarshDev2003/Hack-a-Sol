@@ -34,7 +34,10 @@ export default function DashboardHome() {
   }, []);
 
   const monthly = summary?.monthlyPerformance || [];
-  const categoryData = summary?.categoryDistribution || [];
+  const categoryData = (summary?.categoryBreakdown || []).map(item => ({
+    name: item.category,
+    value: item.amount
+  }));
   const recentTransactions = summary?.recentTransactions || [];
 
   const stats = useMemo(() => {

@@ -69,6 +69,11 @@ router.get('/summary', auth, async (req, res) => {
       amount: categoryBreakdown[category]
     })).sort((a, b) => b.amount - a.amount);
 
+    // Get recent transactions (last 10)
+    const recentTransactions = await Transaction.find({ user: userId })
+      .sort({ date: -1 })
+      .limit(10);
+
     res.json({
       success: true,
       data: {
@@ -79,9 +84,11 @@ router.get('/summary', auth, async (req, res) => {
           documentCount
         },
         monthlyPerformance: monthlyData,
-        categoryBreakdown: categoryData
+        categoryBreakdown: categoryData,
+        recentTransactions
       }
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
